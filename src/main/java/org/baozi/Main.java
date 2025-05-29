@@ -46,7 +46,7 @@ public class Main {
 
     public static void splitFile(String filePath, String sliceOutputPath, String sliceRecordPath) throws Exception {
         long startPos = 0L;
-        int batchSize = 10240, sliceNum = 0, maxFileLenPerSliceFile = 1024 * 1024 * 10;
+        int batchSize = 10240, sliceNum = 0, maxFileLenPerSliceFile = 1024 * 1024;
         File readFile = new File(filePath);
         long totalLength = readFile.length();
         LinkedList<TempFileRecord> tempFileRecords = new LinkedList<>();
@@ -130,20 +130,19 @@ public class Main {
 //            });
 
 
-            for (TempFileRecord tempFileRecord : tempFileRecordList) {
-                try (FileInputStream fileInputStream = new FileInputStream(tempFileRecord.filePath());
-                     BufferedInputStream bufferedInputStream = new BufferedInputStream(fileInputStream)) {
-                    int readBytes;
-                    mergeAccessFile.seek(tempFileRecord.startPos());
-                    while ((readBytes = bufferedInputStream.readNBytes(bytes, 0, batchSize)) != 0) {
-                        mergeAccessFile.write(bytes, 0, readBytes);
-                    }
-                }
-            }
+//            for (TempFileRecord tempFileRecord : tempFileRecordList) {
+//                try (FileInputStream fileInputStream = new FileInputStream(tempFileRecord.filePath());
+//                     BufferedInputStream bufferedInputStream = new BufferedInputStream(fileInputStream)) {
+//                    int readBytes;
+//                    mergeAccessFile.seek(tempFileRecord.startPos());
+//                    while ((readBytes = bufferedInputStream.readNBytes(bytes, 0, batchSize)) != 0) {
+//                        mergeAccessFile.write(bytes, 0, readBytes);
+//                    }
+//                }
+//            }
 
 
 //            FileChannel writeChannel = mergeAccessFile.getChannel();
-//
 //            for (TempFileRecord tempFileRecord : tempFileRecordList) {
 //                String tempFilePathStr = tempFileRecord.filePath();
 //                Path tempFilePath = Paths.get(tempFilePathStr);
@@ -175,7 +174,6 @@ public class Main {
 
 
 //            FileChannel writeChannel = mergeAccessFile.getChannel();
-//
 //            for (TempFileRecord tempFileRecord : tempFileRecordList) {
 //                String tempFilePathStr = tempFileRecord.filePath();
 //                Path tempFilePath = Paths.get(tempFilePathStr);
@@ -184,10 +182,10 @@ public class Main {
 //                        FileChannel readChannel = (FileChannel) Files.newByteChannel(tempFilePath, StandardOpenOption.READ);
 //                ) {
 //
+//
 //                    BasicFileAttributeView fileAttributeView = Files.getFileAttributeView(tempFilePath, BasicFileAttributeView.class);
 //                    BasicFileAttributes basicFileAttributes = fileAttributeView.readAttributes();
 //                    long readFileByteLen = basicFileAttributes.size();
-//
 //                    byteBuffer = ByteBuffer.allocateDirect((int) readFileByteLen);
 //
 //                    readChannel.read(byteBuffer);
@@ -200,6 +198,48 @@ public class Main {
 //                }
 //            }
 
+
+//            FileChannel writeChannel = mergeAccessFile.getChannel();
+//            for (TempFileRecord tempFileRecord : tempFileRecordList) {
+//                String tempFilePathStr = tempFileRecord.filePath();
+//                Path tempFilePath = Paths.get(tempFilePathStr);
+//                try (
+//                        FileChannel readChannel = (FileChannel) Files.newByteChannel(tempFilePath, StandardOpenOption.READ);
+//                ) {
+//
+//
+//                    BasicFileAttributeView fileAttributeView = Files.getFileAttributeView(tempFilePath, BasicFileAttributeView.class);
+//                    BasicFileAttributes basicFileAttributes = fileAttributeView.readAttributes();
+//                    long readFileByteLen = basicFileAttributes.size();
+//
+//                    writeChannel.position(tempFileRecord.startPos());
+//                    readChannel.transferTo(0, readFileByteLen, writeChannel);
+//
+//                }
+//            }
+//            writeChannel.close();
+
+            final FileChannel writeChannel = mergeAccessFile.getChannel();
+            tempFileRecordList.parallelStream().forEach(tempFileRecord -> {
+                String tempFilePathStr = tempFileRecord.filePath();
+                Path tempFilePath = Paths.get(tempFilePathStr);
+                try (
+                        FileChannel readChannel = (FileChannel) Files.newByteChannel(tempFilePath, StandardOpenOption.READ);
+                ) {
+
+
+                    BasicFileAttributeView fileAttributeView = Files.getFileAttributeView(tempFilePath, BasicFileAttributeView.class);
+                    BasicFileAttributes basicFileAttributes = fileAttributeView.readAttributes();
+                    long readFileByteLen = basicFileAttributes.size();
+
+                    writeChannel.position(tempFileRecord.startPos());
+                    readChannel.transferTo(0, readFileByteLen, writeChannel);
+
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            });
+            writeChannel.close();
 
         }
     }
